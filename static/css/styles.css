@@ -1,0 +1,12 @@
+/* src/static/css/styles.css */
+body {
+    padding-top: 70px;
+}
+
+.table th, .table td {
+    vertical-align: middle;
+}
+
+.badge {
+    margin-right: 5px;
+}

@@ -1,0 +1,13 @@
+<!-- src/templates/upload.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Upload PDF Files</h2>
+<form method="POST" enctype="multipart/form-data">
+    <div class="form-group">
+        <label for="files">Select PDF files to upload:</label>
+        <input type="file" class="form-control-file" id="files" name="files[]" multiple accept=".pdf" required>
+    </div>
+    <button type="submit" class="btn btn-primary">Upload and Process</button>
+</form>
+{% endblock %}

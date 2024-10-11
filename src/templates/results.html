@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <h2 class="mb-0">Document Analysis Results</h2>
+            <p class="text-muted">View and manage your processed documents</p>
+        </div>
+        <div class="col-md-6 text-md-end">
+            <a href="{{ url_for('export_data') }}" class="btn btn-outline-primary">
+                <i class="fas fa-download me-2"></i>Export Results
+            </a>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="input-group">
+                <span class="input-group-text bg-light">
+                    <i class="fas fa-filter"></i>
+                </span>
+                <select class="form-select" id="filterStatus" onchange="filterDocuments()">
+                    <option value="all">All Status</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Processing">Processing</option>
+                    <option value="Failed">Failed</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="input-group">
+                <span class="input-group-text bg-light">
+                    <i class="fas fa-sort"></i>
+                </span>
+                <select class="form-select" id="sortOption" onchange="sortDocuments()">
+                    <option value="uploaded_at">Sort by Date</option>
+                    <option value="document_name">Sort by Name</option>
+                    <option value="status">Sort by Status</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="input-group">
+                <span class="input-group-text bg-light">
+                    <i class="fas fa-search"></i>
+                </span>
+                <input type="text" class="form-control" id="searchInput" placeholder="Search documents..." onkeyup="searchDocuments()">
+            </div>
+        </div>
+    </div>
+
+    <div id="documentsContainer" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
+        {% if documents %}
+            {% for doc in documents %}
+                <div class="col document-card" data-document-name="{{ doc.document_name.lower() }}" data-status="{{ doc.status }}">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0 text-truncate" title="{{ doc.document_name }}">
+                                {{ doc.document_name }}
+                            </h5>
+                            {% if doc.status %}
+                                <span class="badge bg-{% if doc.status == 'Completed' %}success{% elif doc.status == 'Processing' %}warning{% else %}danger{% endif %}">
+                                    {{ doc.status }}
+                                </span>
+                            {% endif %}
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <h6 class="text-muted mb-2">Summary</h6>
+                                <p class="card-text" id="summary-{{ doc._id }}">
+                                    {% if doc.summary %}
+                                        {{ doc.summary[:200] }}{% if doc.summary|length > 200 %}...{% endif %}
+                                    {% else %}
+                                        <span class="text-muted">No summary available</span>
+                                    {% endif %}
+                                </p>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h6 class="text-muted mb-2">Keywords</h6>
+                                <div id="keywords-{{ doc._id }}">
+                                    {% if doc.keywords %}
+                                        {% for keyword in doc.keywords %}
+                                            <span class="badge bg-primary me-1 mb-1">{{ keyword }}</span>
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="text-muted">No keywords extracted</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <small class="text-muted">{{ doc.num_pages }} pages</small>
+                                <button class="btn btn-sm btn-outline-primary" onclick="showDetails('{{ doc._id }}')">
+                                    View Details
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="alert alert-info" role="alert">
+                    <i class="fas fa-info-circle me-2"></i>No documents have been processed yet. Please upload files to get started.
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal for document details -->
+<div class="modal fade" id="documentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Document Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="modalContent">
+                <!-- Content will be dynamically populated -->
+            </div>
+            <div class="modal-footer">
+                <!-- <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button> -->
+                <!-- <a href="#" id="downloadBtn" class="btn btn-primary">Download Document</a> -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let allDocuments = [];
+
+function fetchDocuments() {
+    const status = document.getElementById('filterStatus').value;
+    const sortBy = document.getElementById('sortOption').value;
+
+    fetch(`/api/documents?status=${status}&sort_by=${sortBy}`)
+        .then(response => response.json())
+        .then(data => {
+            allDocuments = data;
+            updateDocumentsDisplay();
+        })
+        .catch(error => console.error('Error fetching documents:', error));
+}
+
+function updateDocumentsDisplay() {
+    const container = document.getElementById('documentsContainer');
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const statusFilter = document.getElementById('filterStatus').value;
+
+    const filteredDocs = allDocuments.filter(doc => {
+        const matchesSearch = doc.document_name.toLowerCase().includes(searchTerm);
+        const matchesStatus = statusFilter === 'all' || doc.status === statusFilter;
+        return matchesSearch && matchesStatus;
+    });
+
+    if (filteredDocs.length === 0) {
+        container.innerHTML = `
+            <div class="col-12">
+                <div class="alert alert-info" role="alert">
+                    <i class="fas fa-info-circle me-2"></i>No documents found matching your criteria.
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = filteredDocs.map(doc => `
+        <div class="col document-card">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 text-truncate" title="${doc.document_name}">
+                        ${doc.document_name}
+                    </h5>
+                    ${doc.status ? `
+                        <span class="badge bg-${doc.status === 'Completed' ? 'success' : doc.status === 'Processing' ? 'warning' : 'danger'}">
+                            ${doc.status}
+                        </span>
+                    ` : ''}
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <h6 class="text-muted mb-2">Summary</h6>
+                        <p class="card-text">
+                            ${doc.summary ? doc.summary.substring(0, 200) + (doc.summary.length > 200 ? '...' : '') : '<span class="text-muted">No summary available</span>'}
+                        </p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="text-muted mb-2">Keywords</h6>
+                        <div>
+                            ${doc.keywords && doc.keywords.length > 0 
+                                ? doc.keywords.map(k => `<span class="badge bg-primary me-1 mb-1">${k}</span>`).join('') 
+                                : '<span class="text-muted">No keywords extracted</span>'}
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <small class="text-muted">${doc.num_pages} pages</small>
+                        <button class="btn btn-sm btn-outline-primary" onclick="showDetails('${doc._id}')">
+                            View Details
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function showDetails(docId) {
+    const doc = allDocuments.find(d => d._id === docId);
+    if (!doc) return;
+
+    const modalContent = document.getElementById('modalContent');
+    const downloadBtn = document.getElementById('downloadBtn');
+    
+    modalContent.innerHTML = `
+        <div class="mb-4">
+            <h6 class="text-muted mb-2">Complete Summary</h6>
+            <p>${doc.summary || '<span class="text-muted">No summary available</span>'}</p>
+        </div>
+        <div class="mb-4">
+            <h6 class="text-muted mb-2">All Keywords</h6>
+            <div>
+                ${doc.keywords && doc.keywords.length > 0 
+                    ? doc.keywords.map(k => `<span class="badge bg-primary me-1 mb-1">${k}</span>`).join('') 
+                    : '<span class="text-muted">No keywords extracted</span>'}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <h6 class="text-muted mb-2">Document Information</h6>
+                <ul class="list-unstyled">
+                    <li><strong>Pages:</strong> ${doc.num_pages}</li>
+                    <li><strong>Status:</strong> ${doc.status}</li>
+                </ul>
+            </div>
+        </div>
+    `;
+    
+    // downloadBtn.href = `/download/${docId}`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('documentModal'));
+    modal.show();
+}
+
+function searchDocuments() {
+    updateDocumentsDisplay();
+}
+
+function filterDocuments() {
+    updateDocumentsDisplay();
+}
+
+function sortDocuments() {
+    const sortBy = document.getElementById('sortOption').value;
+    const sortFunctions = {
+        'uploaded_at': (a, b) => new Date(b.uploaded_at) - new Date(a.uploaded_at),
+        'document_name': (a, b) => a.document_name.localeCompare(b.document_name),
+        'status': (a, b) => a.status.localeCompare(b.status)
+    };
+    
+    allDocuments.sort(sortFunctions[sortBy]);
+    updateDocumentsDisplay();
+}
+
+// Initial fetch
+fetchDocuments();
+
+// Poll every 5 seconds
+setInterval(fetchDocuments, 5000);
+</script>
+{% endblock %}

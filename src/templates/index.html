@@ -1,0 +1,12 @@
+<!-- src/templates/index.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="jumbotron">
+    <h1 class="display-4">Welcome to the PDF Summarization & Keyword Extraction Pipeline!</h1>
+    <p class="lead">Upload your PDF documents and receive concise summaries along with domain-specific keywords.</p>
+    <hr class="my-4">
+    <a class="btn btn-primary btn-lg" href="{{ url_for('upload_files') }}" role="button">Upload PDFs</a>
+    <a class="btn btn-success btn-lg" href="{{ url_for('view_results') }}" role="button">View Results</a>
+</div>
+{% endblock %}

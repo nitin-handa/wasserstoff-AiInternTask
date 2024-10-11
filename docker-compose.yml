@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:6.0
+    container_name: mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  web:
+    build: .
+    container_name: pdf_pipeline_flask
+    restart: always
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mongo
+    environment:
+      - MONGODB_URI=mongodb://localhost:27017/
+      - SECRET_KEY=ZKK7bpJHjL0owUGJd-tsi7OgE7tt7p7ix  
+    volumes:
+      - ./src/static/uploads:/app/src/static/uploads
+      - ./pipeline.log:/app/pipeline.log
+
+volumes:
+  mongo_data:
